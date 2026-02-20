@@ -1,0 +1,24 @@
+Python Practice Support Module
+
+Learning a new programming language, especially after coding in other languages for so long, can be a daunting task! The only way to get through it is to practice, practice, practice! In this module, we provide a few additional resources for you to use.
+
+Practice Problems
+W3Schools Python Tutorial: https://www.w3schools.com/python/default.asp
+Get hands-on practice with many Python concepts from the beginning, from basic syntax, to Strings, to tuples, to arrays, to classes/objects, and more!
+CodeAcademy Python Course: https://www.codecademy.com/learn/python-for-programmers
+A Python course designed to help programmers transition into Python! 
+Pynative Python Practice Problems: https://pynative.com/python-exercises-with-solutions/
+Practice problems divided by subject and difficulty as well as MC questions.
+PracticePython Practice Problems: https://www.practicepython.org/
+More problems with detailed explanations. 
+
+Video resources
+Python Tutorial for Java Programmers: https://www.youtube.com/watch?v=PCsCAMfwvos&ab_channel=EZCoding
+If you started with Java, this tutorial does a great job in explaining the syntactic differences. 
+Python Tutorial - Python Full Course for Beginners: https://www.youtube.com/watch?v=_uQrJ0TkZlc
+
+Documents and Tutorials
+Python Cheatsheet for JAVA Developers: https://github.com/akashp1712/awesome-python-cheatsheets/blob/master/Python_for_Java_developers_cheat_sheet.pdf
+A great resources to help students with the transition from JAVA to Python.
+Python Project-Based Learning: https://github.com/practical-tutorials/project-based-learning#python
+Provides several Python-based project tutorials to really solidify your learning.
