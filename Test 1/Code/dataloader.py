@@ -8,6 +8,7 @@ from typing import List
 
 from langchain_community.document_loaders import DirectoryLoader, TextLoader, PDFPlumberLoader
 from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 
@@ -93,3 +94,31 @@ def load_all_documents() -> List[Document]:
     
     print(f"\nTotal documents loaded: {len(all_documents)}")
     return all_documents
+
+def split_documents(documents: List[Document], chunk_size: int = 1000, chunk_overlap: int = 200) -> List[Document]:
+    """Split documents into smaller chunks using RecursiveCharacterTextSplitter.
+
+    Args:
+        documents (List[Document]): List of documents to split
+        chunk_size (int, optional): Maximum size of each chunk in characters. Defaults to 1000.
+        chunk_overlap (int, optional): Number of characters to overlap between chunks. Defaults to 200.
+
+    Raises:
+        ValueError: If chunk_overlap is greater than or equal to chunk_size
+
+    Returns:
+        List[Document]: List of split document chunks
+    """
+    if chunk_overlap >= chunk_size:
+        raise ValueError("chunk_overlap must be less than chunk_size")
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=["\n\n", "\n", " ", ""]
+    )
+    
+    split_docs = text_splitter.split_documents(documents)
+    print(f"\nDocuments split into {len(split_docs)} chunks")
+    
+    return split_docs
