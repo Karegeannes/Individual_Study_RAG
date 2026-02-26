@@ -5,7 +5,6 @@ Loads stored documents using LangChain
 
 from pathlib import Path
 from typing import List
-
 from langchain_community.document_loaders import DirectoryLoader, TextLoader, PDFPlumberLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -13,8 +12,6 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 import json
 import hashlib
 from datetime import datetime
-
-
 
 def get_docs_path() -> Path:
     """Get the absolute path to the Document Corpus directory.
@@ -45,6 +42,7 @@ def load_text_documents() -> List[Document]:
         str(corpus_path),
         glob="**/*.txt",
         loader_cls=TextLoader,
+        loader_kwargs={"encoding": "utf-16"},
         silent_errors=True
     )
     
@@ -70,6 +68,7 @@ def load_pdf_documents() -> List[Document]:
         str(corpus_path),
         glob="**/*.pdf",
         loader_cls=PDFPlumberLoader,
+        loader_kwargs={"encoding": "utf-16"},
         silent_errors=True
     )
     
@@ -127,7 +126,8 @@ def split_documents(documents: List[Document], chunk_size: int = 1000, chunk_ove
     #Add metadata for source, chunk index, and length of each chunk
     counts: dict[str, int] = {}
     for doc in split_docs:
-        src = doc.metadata.get("source", "")
+        doc.metadata["src"] = str(Path(doc.metadata.get("source", "")).relative_to(Path(__file__).parent.parent))
+        src = doc.metadata["src"]
         idx = counts.get(src, 0)
         doc.metadata["chunk_index"] = idx
         doc.metadata["length"] = len(doc.page_content)
@@ -149,6 +149,7 @@ def generate_embeddings(documents: List[Document], embedding_model: str = "sente
     """
     embeddings_path = Path(__file__).parent / "embeddings.json"
 
+    #Embedding loading section
     def make_id(text: str) -> str:
         #Use SHA-256 hash of the text content to generate unique IDs for documents. As a bonus, it also prevents duplicates.
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -173,25 +174,26 @@ def generate_embeddings(documents: List[Document], embedding_model: str = "sente
         print("No new documents to embed")
         return
 
+    #Embedding generation section
     embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
     new_vectors = embeddings.embed_documents([doc.page_content for doc in docs_to_embed])
     
     for doc, vec, doc_id in zip(docs_to_embed, new_vectors, new_ids):
         record = {
             "id": doc_id,
-            "source": doc.metadata.get("source", ""),
+            "source": doc.metadata.get("src"),
             "chunk_index": doc.metadata.get("chunk_index"),
-            "length": len(doc.page_content),
+            "length": doc.metadata.get("length"),
             "text": doc.page_content,
             "model": embedding_model,
             "created_at": datetime.utcnow().isoformat() + "Z",
             "vector": vec,
         }
-        existing_records.append(record)
+        existing_embeddings.append(record)
         id_index[doc_id] = record
 
     with open(embeddings_path, "w", encoding="utf-8") as f:
-        json.dump(existing_records, f, indent=2)
+        json.dump(existing_embeddings, f, indent=2)
 
     print(f"\nGenerated embeddings for {len(new_vectors)} new documents")
 
