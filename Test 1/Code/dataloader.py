@@ -11,6 +11,8 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import json
+import hashlib
+from datetime import datetime
 
 
 
@@ -109,7 +111,7 @@ def split_documents(documents: List[Document], chunk_size: int = 1000, chunk_ove
         ValueError: If chunk_overlap is greater than or equal to chunk_size
 
     Returns:
-        List[Document]: List of split document chunks
+        List[Document]: List of split document chunks with added metadata (source, chunk_index, length)
     """
     if chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be less than chunk_size")
@@ -121,48 +123,80 @@ def split_documents(documents: List[Document], chunk_size: int = 1000, chunk_ove
     )
     
     split_docs = text_splitter.split_documents(documents)
+
+    #Add metadata for source, chunk index, and length of each chunk
+    counts: dict[str, int] = {}
+    for doc in split_docs:
+        src = doc.metadata.get("source", "")
+        idx = counts.get(src, 0)
+        doc.metadata["chunk_index"] = idx
+        doc.metadata["length"] = len(doc.page_content)
+        counts[src] = idx + 1
+
     print(f"\nDocuments split into {len(split_docs)} chunks")
-    
     return split_docs
 
 def generate_embeddings(documents: List[Document], embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"):
-    """Generate embeddings for the given documents using HuggingFaceEmbeddings and save them to a JSON file.
+    """Generate embeddings for the given documents using HuggingFaceEmbeddings and save them to
+    a structured JSON file with rich metadata.
 
     Args:
         documents (List[Document]): List of documents to generate embeddings for
         embedding_model (str, optional): Name of the HuggingFace model to use for embeddings. Defaults to "sentence-transformers/all-MiniLM-L6-v2".
 
     Returns:
-        _type_: List of embeddings corresponding to the input documents
+        List[list[float]]: List of embedding vectors corresponding to the input documents
     """
     embeddings_path = Path(__file__).parent / "embeddings.json"
-    
-    #Load old embeddings
-    existing_embeddings = {}
+
+    def make_id(text: str) -> str:
+        #Use SHA-256 hash of the text content to generate unique IDs for documents. As a bonus, it also prevents duplicates.
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    existing_embeddings = []
+    id_index = {}
     if embeddings_path.exists():
         with open(embeddings_path, 'r') as f:
             existing_embeddings = json.load(f)
+            for record in existing_embeddings:
+                id_index[record["id"]] = record
+
+    docs_to_embed: list[Document] = []
+    new_ids: list[str] = []
+    for doc in documents:
+        doc_id = make_id(doc.page_content)
+        if doc_id not in id_index:
+            docs_to_embed.append(doc)
+            new_ids.append(doc_id)
     
-    #Embed new documents
-    new_docs = [doc for doc in documents if doc.page_content not in existing_embeddings]
-    if not new_docs:
+    if not docs_to_embed:
         print("No new documents to embed")
-        return [existing_embeddings[doc.page_content] for doc in documents]
+        return
+
     embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
-    new_embeddings = embeddings.embed_documents([doc.page_content for doc in new_docs])
+    new_vectors = embeddings.embed_documents([doc.page_content for doc in docs_to_embed])
     
-    #Save new embeddings
-    for doc, embedding in zip(new_docs, new_embeddings):
-        existing_embeddings[doc.page_content] = embedding
-    with open(embeddings_path, 'w') as f:
-        json.dump(existing_embeddings, f)
-    
-    print(f"\nGenerated embeddings for {len(new_embeddings)} new documents")
-    return [existing_embeddings[doc.page_content] for doc in documents]
+    for doc, vec, doc_id in zip(docs_to_embed, new_vectors, new_ids):
+        record = {
+            "id": doc_id,
+            "source": doc.metadata.get("source", ""),
+            "chunk_index": doc.metadata.get("chunk_index"),
+            "length": len(doc.page_content),
+            "text": doc.page_content,
+            "model": embedding_model,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "vector": vec,
+        }
+        existing_records.append(record)
+        id_index[doc_id] = record
+
+    with open(embeddings_path, "w", encoding="utf-8") as f:
+        json.dump(existing_records, f, indent=2)
+
+    print(f"\nGenerated embeddings for {len(new_vectors)} new documents")
 
     #Probably worth adding functionality to remove/update old embeddings for documents that have been deleted/modified, but I'll do that later.
-
-
+    #(I can be lazy and just delete the whole embeddings file and regenerate if I make changes to the documents for now)
 
 if __name__ == "__main__":
     # Load and split documents, then generate embeddings
