@@ -5,7 +5,7 @@ Loads stored documents using LangChain
 
 from pathlib import Path
 from typing import List
-from langchain_community.document_loaders import DirectoryLoader, TextLoader, PDFPlumberLoader
+from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -34,19 +34,29 @@ def load_text_documents() -> List[Document]:
         List[Document]: List of loaded text documents
     """
     corpus_path = get_docs_path()
-    
     if not corpus_path.exists():
         raise FileNotFoundError(f"Documents not found at: {corpus_path}")
-    
-    loader = DirectoryLoader(
-        str(corpus_path),
-        glob="**/*.txt",
-        loader_cls=TextLoader,
-        loader_kwargs={"encoding": "utf-16"},
-        silent_errors=True
-    )
-    
-    documents = loader.load()
+
+    documents: List[Document] = []
+
+    #Walk through all .txt files in the corpus directory and load them with proper encoding handling
+    for txt_file in corpus_path.rglob("*.txt"):
+        try:
+            raw = txt_file.read_bytes()
+            if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+                text = raw.decode("utf-16")
+            elif raw.startswith(b"\xef\xbb\xbf"):
+                text = raw.decode("utf-8-sig")
+            else:
+                try:
+                    text = raw.decode("utf-8")
+                except UnicodeDecodeError:
+                    text = raw.decode("latin-1")
+            documents.append(Document(page_content=text, metadata={"source": str(txt_file)}))
+        except Exception as e:
+            print(f"Error loading {txt_file}: {e}")
+            continue
+
     print(f"Loaded {len(documents)} text documents from {corpus_path}")
     return documents
 
@@ -60,19 +70,20 @@ def load_pdf_documents() -> List[Document]:
         List[Document]: List of loaded PDF documents
     """
     corpus_path = get_docs_path()
-    
+
     if not corpus_path.exists():
         raise FileNotFoundError(f"Documents not found at: {corpus_path}")
-    
-    loader = DirectoryLoader(
-        str(corpus_path),
-        glob="**/*.pdf",
-        loader_cls=PDFPlumberLoader,
-        loader_kwargs={"encoding": "utf-16"},
-        silent_errors=True
-    )
-    
-    documents = loader.load()
+
+    documents: List[Document] = []
+    for pdf_file in corpus_path.rglob("*.pdf"):
+        try:
+            loader = PDFPlumberLoader(str(pdf_file))
+            docs = loader.load()
+            documents.extend(docs)
+        except Exception as e:
+            print(f"Error loading {pdf_file}: {e}")
+            continue
+
     print(f"Loaded {len(documents)} PDF documents from {corpus_path}")
     return documents
 
