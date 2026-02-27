@@ -3,10 +3,36 @@ from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import json
 from sklearn.metrics.pairwise import cosine_similarity
+from nltk.corpus import wordnet
+import nltk
 
 def embed_query(query: str, embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    #Process the query before embedding
+    processed_query = query.strip().lower()
+    processed_query = " ".join(processed_query.split())
+
+    #Query expansion using WordNet synonyms
+    try:
+        nltk.data.find('corpora/wordnet')
+    except LookupError:
+        nltk.download('wordnet')
+    words = processed_query.split()
+    expanded_terms = []
+    for word in words:
+        synsets = wordnet.synsets(word)
+        for synset in synsets[:1]:
+            for lemma in synset.lemmas()[:1]:
+                synonym = lemma.name().replace('_', ' ')
+                if synonym != word:
+                    expanded_terms.append(synonym)
+    if expanded_terms:
+        processed_query = processed_query + " " + " ".join(expanded_terms)
+    print(f"Processed Query: {processed_query}")
+
+    #Embedding generation
     embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
-    vector = embeddings.embed_documents([query])[0]
+    vector = embeddings.embed_documents([processed_query])[0]
+    
     return vector
 
 def load_embeddings():
