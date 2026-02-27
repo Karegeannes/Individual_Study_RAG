@@ -3,7 +3,7 @@ from typing import List
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import json
 from sklearn.metrics.pairwise import cosine_similarity
-from nltk.corpus import wordnet
+from nltk.corpus import wordnet, stopwords
 import nltk
 
 #Cache the embeddings model to avoid redundant loading and improve performance
@@ -32,17 +32,28 @@ def embed_query(query: str, embedding_model: str = "sentence-transformers/all-Mi
         nltk.data.find('corpora/wordnet')
     except LookupError:
         nltk.download('wordnet')
+    
+    try:
+        nltk.data.find('corpora/stopwords')
+    except LookupError:
+        nltk.download('stopwords')
+    
+    stop_words = set(stopwords.words('english'))
     words = processed_query.split()
-    expanded_terms = []
+    expanded_terms = set()
     for word in words:
+        if word in stop_words:
+            continue
         synsets = wordnet.synsets(word)
-        for synset in synsets[:1]:
-            for lemma in synset.lemmas()[:1]:
+        for synset in synsets[:3]:
+            for lemma in synset.lemmas()[:2]:
                 synonym = lemma.name().replace('_', ' ')
                 if synonym != word:
-                    expanded_terms.append(synonym)
+                    expanded_terms.add(synonym)
+    expanded_terms = list(expanded_terms)[:10]
     if expanded_terms:
         processed_query = processed_query + " " + " ".join(expanded_terms)
+    
     print(f"Processed Query: {processed_query}")
 
     #Embedding generation
