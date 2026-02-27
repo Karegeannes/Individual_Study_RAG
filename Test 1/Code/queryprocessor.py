@@ -6,6 +6,22 @@ from sklearn.metrics.pairwise import cosine_similarity
 from nltk.corpus import wordnet
 import nltk
 
+#Cache the embeddings model to avoid redundant loading and improve performance
+_embeddings_cache = {}
+
+def get_embeddings_model(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    """ Get a cached HuggingFaceEmbeddings model or create a new one if it doesn't exist in the cache.
+
+    Args:
+        model_name (str, optional): Name of the HuggingFace model to use for embeddings. Defaults to "sentence-transformers/all-MiniLM-L6-v2".
+
+    Returns:
+        _type_: The cached or newly created HuggingFaceEmbeddings model.
+    """
+    if model_name not in _embeddings_cache:
+        _embeddings_cache[model_name] = HuggingFaceEmbeddings(model_name=model_name)
+    return _embeddings_cache[model_name]
+
 def embed_query(query: str, embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"):
     #Process the query before embedding
     processed_query = query.strip().lower()
@@ -30,7 +46,7 @@ def embed_query(query: str, embedding_model: str = "sentence-transformers/all-Mi
     print(f"Processed Query: {processed_query}")
 
     #Embedding generation
-    embeddings = HuggingFaceEmbeddings(model_name=embedding_model)
+    embeddings = get_embeddings_model(embedding_model)
     vector = embeddings.embed_documents([processed_query])[0]
     
     return vector
